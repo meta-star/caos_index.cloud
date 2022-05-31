@@ -12,27 +12,19 @@ const
         cache: require('./src/init/cache'),
         database: require('./src/init/database'),
         jwt_secret: require('./src/init/jwt_secret')
-    },
-    util = {
-        email: require('./src/utils/mail'),
-        token: require('./src/utils/token'),
-        ip_address: require('./src/utils/ip_address')
-    },
-    middleware = {
-        access: require('./src/middlewares/access'),
-        inspector: require('./src/middlewares/inspector'),
-        validator: require('express-validator')
     };
 
 const app = require('./src/init/express')(ctx);
+
+const controllers = [
+    require('./v1/index')
+];
 
 app.get('/', (_, res) => {
     res.redirect(StatusCodes.MOVED_PERMANENTLY, process.env.WEBSITE_URL);
 });
 
-app.get('/ip', (req, res) => {
-    res.send({ip_address: util.ip_address(req)});
-});
+controllers.forEach((c) => c(ctx, app));
 
 app.listen(process.env.HTTP_PORT, process.env.HTTP_HOSTNAME, () => {
     console.log(constant.APP_NAME)
