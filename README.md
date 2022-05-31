@@ -1,3 +1,3 @@
-# template.recv
+# caOS Cloud API Service
 
-後端 API 通用模板
+> (c) 2022 Star Inc.
