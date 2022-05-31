@@ -17,7 +17,7 @@ const
 const app = require('./src/init/express')(ctx);
 
 const controllers = [
-    require('./v1/index')
+    require('./src/controllers/v1/index')
 ];
 
 app.get('/', (_, res) => {

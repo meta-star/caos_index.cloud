@@ -2,7 +2,7 @@ const {StatusCodes} = require('http-status-codes');
 const {Router} = require('express');
 
 const {create} = require('axios');
-const ip_address = require('../src/utils/ip_address');
+const ip_address = require('../../utils/ip_address');
 
 const feature_router = Router();
 const http_client = {
