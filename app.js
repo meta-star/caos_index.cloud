@@ -21,14 +21,21 @@ const controllers = [
 ];
 
 app.get('/', (_, res) => {
-    res.redirect(StatusCodes.MOVED_PERMANENTLY, process.env.WEBSITE_URL);
+    res.send({
+        status: StatusCodes.OK,
+        data: {
+            description: "caOS Cloud API Service",
+            information: "https://caos.startw.cf/",
+            copyright: "(c)2022 Star Inc."
+        }
+    });
 });
 
 controllers.forEach((c) => c(ctx, app));
 
-app.listen(process.env.HTTP_PORT, process.env.HTTP_HOSTNAME, () => {
-    console.log(constant.APP_NAME)
-    console.log('====')
-    console.log('Application is listening at')
-    console.log(`http://localhost:${process.env.HTTP_PORT}`)
+console.log(`${constant.APP_NAME}\n====`);
+require('./src/execute')(app, ({type, hostname, port}) => {
+    const protocol = type === 'general' ? 'http' : 'https';
+    console.log(`Protocol "${protocol}" is listening at`);
+    console.log(`${protocol}://${hostname}:${port}`);
 });

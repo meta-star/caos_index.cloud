@@ -1,6 +1,14 @@
-const {validateAuthToken} = require('../utils/token');
+"use strict";
+// Validate "Authorization" header, but it will not interrupt the request.
+// To interrupt the request which without the request, please use "access.js" middleware.
 
-module.exports = (ctx) => function (req, _, next) {
+// Import auth_methods
+const auth_methods = {
+    "CAOS": async (ctx, req, _) => require('../utils/caos_token').validateAuthToken(ctx, req.auth_secret)
+};
+
+// Export (function)
+module.exports = (ctx) => function (req, res, next) {
     const auth_code = req.header('Authorization');
     if (!auth_code) {
         next();
@@ -12,11 +20,12 @@ module.exports = (ctx) => function (req, _, next) {
         return;
     }
     req.auth_method = params[0];
-    switch (params[0]) {
-        case "SARA": {
-            req.authenticated = validateAuthToken(ctx, params[1]);
-            break;
-        }
+    req.auth_secret = params[1];
+    if (!(req.auth_method in auth_methods)) {
+        next();
+        return;
     }
-    next();
+    auth_methods[req.auth_method](ctx, req, res)
+        .then(() => next())
+        .catch((error) => console.error(error));
 };
