@@ -30,6 +30,7 @@ app.get('/', (_, res) => {
         }
     });
 });
+app.get('/robots.txt', (_, res) => res.type('txt').send("User-agent: *\nDisallow: /"));
 
 controllers.forEach((c) => c(ctx, app));
 
