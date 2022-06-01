@@ -33,7 +33,7 @@ app.get('/', (_, res) => {
 
 controllers.forEach((c) => c(ctx, app));
 
-console.log(`${constant.APP_NAME}\n====`);
+console.log(`${constant.APP_NAME} (runtime: ${process.env.RUNTIME_ENV || "native"})\n====`);
 require('./src/execute')(app, ({type, hostname, port}) => {
     const protocol = type === 'general' ? 'http' : 'https';
     console.log(`Protocol "${protocol}" is listening at`);
