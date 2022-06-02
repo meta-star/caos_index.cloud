@@ -4,7 +4,7 @@ const {Router} = require('express');
 const router = Router();
 const routes = [
     require('./automate'),
-    require('./register'),
+    require('./machine'),
     require('./weather'),
 ];
 

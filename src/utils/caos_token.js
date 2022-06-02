@@ -13,7 +13,6 @@ const {v4: uuidV4} = require('uuid');
 // Define general_issue_options Generator
 const general_issue_options = (metadata) => ({
     algorithm: "HS256",
-    expiresIn: "1d",
     notBefore: "500ms",
     audience: process.env.WEBSITE_URL,
     issuer: sha256(metadata.ctx.jwt_secret),

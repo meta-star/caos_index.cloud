@@ -26,6 +26,11 @@ module.exports = (ctx) => function (req, res, next) {
         return;
     }
     auth_methods[req.auth_method](ctx, req, res)
-        .then(() => next())
+        .then((result) => {
+            if (!req.authenticated) {
+                req.authenticated = result;
+            }
+            next();
+        })
         .catch((error) => console.error(error));
 };
