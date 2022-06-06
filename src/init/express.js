@@ -14,7 +14,7 @@ module.exports = (ctx) => {
     app.use(require('../middlewares/auth')(ctx));
 
     // Request body parser
-    app.use(express.urlencoded({extended: true}));
+    app.use(express.json());
 
     // Optional middlewares
     if (process.env.HTTPS_REDIRECT === 'yes') {

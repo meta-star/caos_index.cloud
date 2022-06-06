@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 module.exports = new Schema({
-    id: String,
+    _id: String,
     assign_code: Number,
     feature: Array,
     state: {
