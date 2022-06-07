@@ -29,9 +29,12 @@ const general_validate_options = (metadata) => ({
 });
 
 // Issue Function
-function issueAuthToken(ctx, uuid) {
+function issueAuthToken(ctx, uuid, data = null) {
     const issue_options = general_issue_options({ctx});
     const payload = {sub: uuid, jti: uuidV4(null, null, null)};
+    if (data) {
+        payload.data = data;
+    }
     return jwt.sign(payload, ctx.jwt_secret, issue_options, null);
 }
 

@@ -4,6 +4,11 @@ const {Router} = require("express");
 const access = require("../../middlewares/access");
 const AutomateItemSchema = require("../../schemas/AutomateItem");
 
+const {issueAuthToken} = require("../../utils/caos_token");
+
+const validator = require("express-validator");
+const inspector = require("../../middlewares/inspector");
+
 const sensitive_eraser = (j) => {
     if (j.assign_code) {
         delete j.assign_code;
@@ -26,7 +31,29 @@ module.exports = (ctx, r) => {
         next();
     };
 
-    // Manage device (for active device)
+    router.post('/item',
+        access,
+        validator.body('features').isArray(),
+        inspector,
+        (req, res) => {
+            const machine_id = req.authenticated.sub;
+            const proto_data = req.authenticated?.data || {};
+            proto_data.automate = proto_data.automate || {};
+            proto_data.automate.features = req.body.features;
+            const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
+            AutomateItem.findOneAndUpdate({_id: machine_id}, req.body, {upsert: true})
+                .then(() => {
+                    const secret = issueAuthToken(ctx, machine_id, proto_data);
+                    res.send({machine_id, secret});
+                })
+                .catch((e) => {
+                    console.error(e);
+                    res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
+                });
+        }
+    );
+
+    // Manage device (for Commander)
 
     router.get("/devices", access, (req, res) => {
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
@@ -92,7 +119,7 @@ module.exports = (ctx, r) => {
             });
     });
 
-    // Manage state (for passive device)
+    // Manage state (for Items)
 
     router.get("/state", access, device_middleware, (req, res) => {
         res.send(req.device.state);

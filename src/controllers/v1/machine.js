@@ -8,7 +8,7 @@ module.exports = (ctx, r) => {
 
     router.get('/register', (_, res) => {
         const machine_id = uuidV4(null, null, null);
-        const secret = issueAuthToken(ctx, machine_id);
+        const secret = issueAuthToken(ctx, machine_id, null);
         res.send({machine_id, secret});
     });
 
