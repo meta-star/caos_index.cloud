@@ -7,9 +7,6 @@ const jwt = require('jsonwebtoken');
 // Import SHA256 Generator
 const {sha256} = require('js-sha256');
 
-// Import UUID Generator
-const {v4: uuidV4} = require('uuid');
-
 // Define general_issue_options Generator
 const general_issue_options = (metadata) => ({
     algorithm: "HS256",
@@ -31,10 +28,7 @@ const general_validate_options = (metadata) => ({
 // Issue Function
 function issueAuthToken(ctx, uuid, data = null) {
     const issue_options = general_issue_options({ctx});
-    const payload = {sub: uuid, jti: uuidV4(null, null, null)};
-    if (data) {
-        payload.data = {...data};
-    }
+    const payload = {sub: uuid, data: data ? {...data} : null};
     return jwt.sign(payload, ctx.jwt_secret, issue_options, null);
 }
 
