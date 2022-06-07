@@ -56,8 +56,8 @@ module.exports = (ctx, r) => {
                 features: req.body.features,
                 assign_code
             }, {upsert: true})
-                .then((i) => res.status(StatusCodes.CREATED).send({
-                    machine_id: i._id,
+                .then(() => res.status(StatusCodes.CREATED).send({
+                    machine_id: req.authenticated.sub,
                     assign_code: assign_code,
                     updated_features: req.body.features,
                 }))
