@@ -13,7 +13,7 @@ const http_client = {
     }),
 };
 
-async function _getIpLocation(ip_addr) {
+async function getIpLocation(ip_addr) {
     try {
         const ip_data = await http_client.basic
             .get('basic/network/ip/geo', {
@@ -26,7 +26,7 @@ async function _getIpLocation(ip_addr) {
     }
 }
 
-async function _getWeatherData(location_data) {
+async function getWeatherData(location_data) {
     try {
         return await http_client.weather.get('2.5/weather', {
             params: {
@@ -52,12 +52,12 @@ module.exports = (ctx, r) => {
             res.send(result);
             return;
         }
-        const location_data = await _getIpLocation(ip_addr);
+        const location_data = await getIpLocation(ip_addr);
         if (!location_data) {
             res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
             return;
         }
-        const weather_data = await _getWeatherData(location_data);
+        const weather_data = await getWeatherData(location_data);
         if (!weather_data) {
             res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
             return;
