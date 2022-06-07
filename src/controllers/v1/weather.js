@@ -4,7 +4,6 @@ const {Router} = require('express');
 const {create} = require('axios');
 const ip_address = require('../../utils/ip_address');
 
-const feature_router = Router();
 const http_client = {
     basic: create({
         baseURL: 'https://restapi.starinc.xyz'
@@ -42,8 +41,9 @@ async function _getWeatherData(location_data) {
     }
 }
 
-module.exports = (ctx, router) => {
-    feature_router.get('/ip', async (req, res) => {
+module.exports = (ctx, r) => {
+    const router = Router();
+    router.get('/ip', async (req, res) => {
         const ip_addr = process.env.NODE_ENV !== 'development' ? ip_address(req) : '1.1.1.1';
         const cache_key = `weather_ip_${ip_addr}`;
         if (ctx.cache.has(cache_key)) {
@@ -70,5 +70,5 @@ module.exports = (ctx, router) => {
         result.timestamp = ctx.now();
         res.send(result);
     });
-    router.use('/weather', feature_router);
+    r.use('/weather', router);
 };

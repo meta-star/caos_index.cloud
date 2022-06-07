@@ -14,8 +14,7 @@ module.exports = new Schema({
         update_at: Number
     },
     commander: {
-        id: String,
+        _id: String,
         assign_at: Number
-    },
-    created_at: Number,
+    }
 });

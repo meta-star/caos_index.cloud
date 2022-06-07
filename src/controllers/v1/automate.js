@@ -1,20 +1,20 @@
-const Validator = require('express-validator');
-
 const {StatusCodes} = require("http-status-codes");
 const {Router} = require("express");
 
 const access = require("../../middlewares/access");
-const inspector = require("../../middlewares/inspector");
 const AutomateItemSchema = require("../../schemas/AutomateItem");
 
-const feature_router = Router();
+module.exports = (ctx, r) => {
+    const router = Router();
+    const polling = require("express-longpoll")(router);
 
-module.exports = (ctx, router) => {
-    feature_router.get("/devices", access, (req, res) => {
+    // Manage device (for active device)
+
+    router.get("/devices", access, (req, res) => {
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
         AutomateItem.find({
             commander: {
-                id: req.authenticated.sub,
+                _id: req.authenticated.sub,
             },
         })
             .then((i) =>
@@ -32,12 +32,13 @@ module.exports = (ctx, router) => {
                 res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
             });
     });
-    feature_router.get("/device/:id", (req, res) => {
+
+    router.get("/device/:id", access, (req, res) => {
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
         AutomateItem.findOne({
-            id: req.params.id,
+            _id: req.params.id,
             commander: {
-                id: req.authenticated.sub,
+                _id: req.authenticated.sub,
             },
         })
             .then((i) => {
@@ -51,50 +52,91 @@ module.exports = (ctx, router) => {
                 res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
             });
     });
-    feature_router.post("/device", (_, res) => {
 
-    });
-    feature_router.delete("/device", (_, res) => {
-
-    });
-    feature_router.get("/state", (req, res) => {
+    router.post("/device", access, async (req, res) => {
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-        AutomateItem.findOne({id: req.authenticated.sub})
-            .then((i) => res.send(i))
+        const automate_item = await AutomateItem.findById(req.body._id).exec();
+        if (automate_item.assign_code !== res.body.assign_code) {
+            res.sendStatus(StatusCodes.FORBIDDEN);
+            return;
+        }
+        automate_item.commander = {
+            id: req.authenticated.sub,
+            assign_at: ctx.now(),
+        };
+        automate_item.save()
+            .then(() => {
+                res.sendStatus(StatusCodes.NO_CONTENT);
+            })
             .catch((e) => {
                 console.log(e);
                 res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
             });
     });
-    feature_router.put("/state", (req, res) => {
+
+    router.delete("/device", access, async (req, res) => {
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-        req.body._id = req.authenticated.sub;
-        AutomateItem.findOneAndUpdate({_id: req.body._id}, req.body, {upsert: true})
-            .then(() => res.sendStatus(StatusCodes.NO_CONTENT))
+        const automate_item = await AutomateItem.findById(req.body._id).exec();
+        if (automate_item.commander.id !== req.authenticated.sub) {
+            res.sendStatus(StatusCodes.FORBIDDEN);
+            return;
+        }
+        automate_item.commander = null;
+        automate_item.save()
+            .then(() => {
+                res.sendStatus(StatusCodes.NO_CONTENT);
+            })
             .catch((e) => {
-                console.error(e);
+                console.log(e);
                 res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
             });
     });
-    feature_router.delete("/state", (req, res) => {
+
+    // Manage state (for passive device)
+
+    router.get("/state", access, async (req, res) => {
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-        AutomateItem.findOne({id: req.authenticated.sub})
-            .then((item) => {
-                if (!item) {
-                    res.sendStatus(StatusCodes.NOT_FOUND);
-                } else {
-                    item.delete()
-                        .then(() => res.sendStatus(StatusCodes.OK))
-                        .catch((e) => {
-                            console.error(e);
-                            res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
-                        });
-                }
+        const automate_item = await AutomateItem.findById(req.authenticated.sub).exec();
+        if (!automate_item) {
+            res.status(StatusCodes.NOT_FOUND).send("Unregistered Device");
+            return;
+        }
+        res.send(automate_item.state);
+    });
+
+    polling.create("/state/poll", async (req, res, next) => {
+        await new Promise((resolve) => access(req, res, resolve));
+        const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
+        if (!await AutomateItem.findById(req.authenticated.sub)) {
+            res.status(StatusCodes.NOT_FOUND).send("Unregistered Device");
+            return;
+        }
+        next();
+    }, (req, res, next) => {
+        req.id = req.authenticated.sub;
+        next();
+    });
+
+    router.put("/state", access, async (req, res) => {
+        const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
+        const automate_item = await AutomateItem.findById(req.authenticated.sub).exec();
+        if (!automate_item) {
+            res.status(StatusCodes.NOT_FOUND).send("Unregistered Device");
+            return;
+        }
+        automate_item.state = req.body;
+        automate_item.save()
+            .then(() => {
+                polling.publishToId("/state/poll", req.authenticated.sub, automate_item);
+                res.sendStatus(StatusCodes.NO_CONTENT);
             })
             .catch((e) => {
-                console.error(e);
+                console.log(e);
                 res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
-            })
+            });
     });
-    router.use("/automate", feature_router);
+
+    // Mount
+
+    r.use("/automate", router);
 };

@@ -1,7 +1,6 @@
 const {StatusCodes} = require("http-status-codes");
 const {Router} = require('express');
 
-const router = Router();
 const routes = [
     require('./automate'),
     require('./machine'),
@@ -9,6 +8,7 @@ const routes = [
 ];
 
 module.exports = (ctx, app) => {
+    const router = Router();
     router.get('/', (_, res) => {
         res.send({status: StatusCodes.OK});
     });
