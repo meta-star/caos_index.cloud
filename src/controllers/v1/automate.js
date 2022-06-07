@@ -10,7 +10,7 @@ const inspector = require("../../middlewares/inspector");
 
 const sensitive_eraser = (j) => {
     if (j.assign_code) {
-        delete j.assign_code;
+        j.assign_code = null;
     }
     return j;
 };
@@ -42,8 +42,8 @@ module.exports = (ctx, r) => {
                 features: req.body.features,
                 assign_code
             }, {upsert: true})
-                .then(() => res.status(StatusCodes.CREATED).send({
-                    machine_id: req.authenticated.sub,
+                .then((i) => res.status(StatusCodes.CREATED).send({
+                    machine_id: i._id,
                     assign_code: assign_code,
                     updated_features: req.body.features,
                 }))
@@ -58,11 +58,7 @@ module.exports = (ctx, r) => {
 
     router.get("/devices", access, (req, res) => {
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-        AutomateItem.find({
-            commander: {
-                _id: req.authenticated.sub,
-            },
-        })
+        AutomateItem.find({"commander._id": req.authenticated.sub})
             .then((i) => res.send(i.map(sensitive_eraser)))
             .catch((e) => {
                 res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
@@ -90,6 +86,7 @@ module.exports = (ctx, r) => {
                 _id: req.authenticated.sub,
                 assign_at: ctx.now(),
             };
+            automate_item.assign_code = null;
             automate_item.save()
                 .then(() => res.sendStatus(StatusCodes.NO_CONTENT))
                 .catch((e) => {
@@ -99,26 +96,27 @@ module.exports = (ctx, r) => {
         }
     );
 
-    router.get("/device/:id", access, (req, res) => {
+    router.get("/device/:id", access, async (req, res) => {
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-        AutomateItem.findOne({
+        const automate_item = await AutomateItem.findOne({
             _id: req.params.id,
-            commander: {
-                _id: req.authenticated.sub,
-            },
-        })
-            .then((i) => res.send(i.map(sensitive_eraser)))
-            .catch((e) => {
-                res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
-                console.error(e);
-            });
+            "commander._id": req.authenticated.sub
+        }).exec();
+        if (!automate_item) {
+            res.sendStatus(StatusCodes.NOT_FOUND);
+            return;
+        }
+        res.send(sensitive_eraser(automate_item));
     });
 
     router.delete("/device/:id", access, async (req, res) => {
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-        const automate_item = await AutomateItem.findById(req.params.id).exec();
-        if (automate_item.commander._id !== req.authenticated.sub) {
-            res.sendStatus(StatusCodes.FORBIDDEN);
+        const automate_item = await AutomateItem.findOne({
+            _id: req.params.id,
+            "commander._id": req.authenticated.sub
+        }).exec();
+        if (!automate_item) {
+            res.sendStatus(StatusCodes.NOT_FOUND);
             return;
         }
         automate_item.commander = null;
