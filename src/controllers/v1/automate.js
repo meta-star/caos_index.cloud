@@ -1,10 +1,9 @@
 const {StatusCodes} = require("http-status-codes");
 const {Router} = require("express");
+const {randomInt} = require('crypto');
 
 const access = require("../../middlewares/access");
 const AutomateItemSchema = require("../../schemas/AutomateItem");
-
-const {issueAuthToken} = require("../../utils/caos_token");
 
 const validator = require("express-validator");
 const inspector = require("../../middlewares/inspector");
@@ -31,24 +30,26 @@ module.exports = (ctx, r) => {
         next();
     };
 
-    router.post('/item',
+    // Register/Update Item
+    router.put('/item',
         access,
         validator.body('features').isArray(),
         inspector,
         (req, res) => {
-            const machine_id = req.authenticated.sub;
-            const proto_data = req.authenticated?.data || {};
-            proto_data.automate = proto_data.automate || {};
-            proto_data.automate.features = req.body.features;
+            const assign_code = randomInt(1000000000, 9999999999);
             const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-            AutomateItem.findOneAndUpdate({_id: machine_id}, req.body, {upsert: true})
-                .then(() => {
-                    const secret = issueAuthToken(ctx, machine_id, proto_data);
-                    res.send({machine_id, secret});
-                })
+            AutomateItem.findOneAndUpdate({_id: req.authenticated.sub}, {
+                features: req.body.features,
+                assign_code
+            }, {upsert: true})
+                .then(() => res.status(StatusCodes.CREATED).send({
+                    machine_id: req.authenticated.sub,
+                    assign_code: assign_code,
+                    updated_features: req.body.features,
+                }))
                 .catch((e) => {
-                    console.error(e);
                     res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
+                    console.error(e);
                 });
         }
     );
@@ -69,24 +70,34 @@ module.exports = (ctx, r) => {
             });
     });
 
-    router.post("/device", access, async (req, res) => {
-        const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-        const automate_item = await AutomateItem.findById(req.body._id).exec();
-        if (automate_item.assign_code !== res.body.assign_code) {
-            res.sendStatus(StatusCodes.FORBIDDEN);
-            return;
+    router.post("/device",
+        access,
+        validator.body('machine_id').isString(),
+        validator.body('assign_code').isNumeric(),
+        inspector,
+        async (req, res) => {
+            const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
+            const automate_item = await AutomateItem.findById(req.body.machine_id).exec();
+            if (!automate_item) {
+                res.sendStatus(StatusCodes.NOT_FOUND);
+                return;
+            }
+            if (automate_item.assign_code !== req.body.assign_code) {
+                res.sendStatus(StatusCodes.FORBIDDEN);
+                return;
+            }
+            automate_item.commander = {
+                _id: req.authenticated.sub,
+                assign_at: ctx.now(),
+            };
+            automate_item.save()
+                .then(() => res.sendStatus(StatusCodes.NO_CONTENT))
+                .catch((e) => {
+                    res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
+                    console.error(e);
+                });
         }
-        automate_item.commander = {
-            id: req.authenticated.sub,
-            assign_at: ctx.now(),
-        };
-        automate_item.save()
-            .then(() => res.sendStatus(StatusCodes.NO_CONTENT))
-            .catch((e) => {
-                res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
-                console.error(e);
-            });
-    });
+    );
 
     router.get("/device/:id", access, (req, res) => {
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
@@ -106,7 +117,7 @@ module.exports = (ctx, r) => {
     router.delete("/device/:id", access, async (req, res) => {
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
         const automate_item = await AutomateItem.findById(req.params.id).exec();
-        if (automate_item.commander.id !== req.authenticated.sub) {
+        if (automate_item.commander._id !== req.authenticated.sub) {
             res.sendStatus(StatusCodes.FORBIDDEN);
             return;
         }
@@ -126,7 +137,9 @@ module.exports = (ctx, r) => {
     });
 
     router.put("/state", access, device_middleware, (req, res) => {
-        req.device.state = req.body;
+        req.device.state = req.device.state || {};
+        req.device.state.direction = false;
+        req.device.state.message = req.body.message;
         req.device.state.update_at = ctx.now();
         req.device.save()
             .then(() => {
@@ -139,15 +152,17 @@ module.exports = (ctx, r) => {
             });
     });
 
-    polling.create("/state/poll",
-        (req, res, next) => access(req, res, () => device_middleware(req, res, next)),
-        (req, res, next) => {
-            req.id = req.authenticated.sub;
-            next();
+    polling.create("/state/poll", [access, device_middleware, (req, res, next) => {
+        if (req.device?.state?.direction) {
+            res.send(req.device.state);
+            return;
         }
-    );
+        next();
+    }, (req, res, next) => {
+        req.id = req.authenticated.sub;
+        next();
+    }]);
 
     // Mount
-
     r.use("/automate", router);
 };
