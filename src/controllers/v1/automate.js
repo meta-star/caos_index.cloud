@@ -19,7 +19,21 @@ module.exports = (ctx, r) => {
     const router = Router();
     const polling = require("express-longpoll")(router);
 
-    const device_middleware = async (req, res, next) => {
+    const device_middleware_param = async (req, res, next) => {
+        const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
+        const automate_item = await AutomateItem.findOne({
+            _id: req.params.id,
+            "commander._id": req.authenticated.sub
+        }).exec();
+        if (!automate_item) {
+            res.sendStatus(StatusCodes.NOT_FOUND);
+            return;
+        }
+        req.device = automate_item;
+        next();
+    };
+
+    const device_middleware_auth = async (req, res, next) => {
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
         const automate_item = await AutomateItem.findById(req.authenticated.sub).exec();
         if (!automate_item) {
@@ -96,47 +110,13 @@ module.exports = (ctx, r) => {
         }
     );
 
-    router.get("/device/:id", access, async (req, res) => {
-        const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-        const automate_item = await AutomateItem.findOne({
-            _id: req.params.id,
-            "commander._id": req.authenticated.sub
-        }).exec();
-        if (!automate_item) {
-            res.sendStatus(StatusCodes.NOT_FOUND);
-            return;
-        }
-        res.send(sensitive_eraser(automate_item));
+    router.get("/device/:id", access, device_middleware_param, (req, res) => {
+        res.send(sensitive_eraser(req.device));
     });
 
-    router.delete("/device/:id", access, async (req, res) => {
-        const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-        const automate_item = await AutomateItem.findOne({
-            _id: req.params.id,
-            "commander._id": req.authenticated.sub
-        }).exec();
-        if (!automate_item) {
-            res.sendStatus(StatusCodes.NOT_FOUND);
-            return;
-        }
-        automate_item.commander = null;
-        automate_item.save()
-            .then(() => res.sendStatus(StatusCodes.NO_CONTENT))
-            .catch((e) => {
-                res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
-                console.error(e);
-            });
-    });
-
-    // Manage state (for Items)
-
-    router.get("/state", access, device_middleware, (req, res) => {
-        res.send(req.device.state);
-    });
-
-    router.put("/state", access, device_middleware, (req, res) => {
+    router.put("/device/:id", access, device_middleware_param, (req, res) => {
         req.device.state = req.device.state || {};
-        req.device.state.direction = false;
+        req.device.state.direction = true;
         req.device.state.message = req.body.message;
         req.device.state.update_at = ctx.now();
         req.device.save()
@@ -150,13 +130,44 @@ module.exports = (ctx, r) => {
             });
     });
 
-    polling.create("/state/poll", [access, device_middleware, (req, res, next) => {
-        if (req.device?.state?.direction) {
-            res.send(req.device.state);
-            return;
-        }
+    polling.create("/device/:id/poll", [access, device_middleware_param, (req, res, next) => {
+        req.id = req.params.id;
         next();
-    }, (req, res, next) => {
+    }]);
+
+    router.delete("/device/:id", access, device_middleware_param, (req, res) => {
+        req.device.commander = null;
+        req.device.save()
+            .then(() => res.sendStatus(StatusCodes.NO_CONTENT))
+            .catch((e) => {
+                res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
+                console.error(e);
+            });
+    });
+
+    // Manage state (for Items)
+
+    router.get("/state", access, device_middleware_auth, (req, res) => {
+        res.send(req.device.state);
+    });
+
+    router.put("/state", access, device_middleware_auth, (req, res) => {
+        req.device.state = req.device.state || {};
+        req.device.state.direction = false;
+        req.device.state.message = req.body.message;
+        req.device.state.update_at = ctx.now();
+        req.device.save()
+            .then(() => {
+                res.sendStatus(StatusCodes.NO_CONTENT);
+                polling.publishToId("/device/:id/poll", req.authenticated.sub, req.device.state);
+            })
+            .catch((e) => {
+                res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
+                console.error(e);
+            });
+    });
+
+    polling.create("/state/poll", [access, device_middleware_auth, (req, res, next) => {
         req.id = req.authenticated.sub;
         next();
     }]);
