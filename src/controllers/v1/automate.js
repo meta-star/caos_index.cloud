@@ -159,7 +159,7 @@ module.exports = (ctx, r) => {
         req.device.save()
             .then(() => {
                 res.sendStatus(StatusCodes.NO_CONTENT);
-                polling.publishToId("/device/:id/poll", req.authenticated.sub, req.device.state);
+                polling.publishToId("/device/:id/poll", req.device._id, req.device.state);
             })
             .catch((e) => {
                 res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
@@ -168,7 +168,7 @@ module.exports = (ctx, r) => {
     });
 
     polling.create("/state/poll", [access, device_middleware_auth, (req, res, next) => {
-        req.id = req.authenticated.sub;
+        req.id = req.device._id;
         next();
     }]);
 
