@@ -20,10 +20,11 @@ module.exports = (ctx, r) => {
     const polling = require("express-longpoll")(router);
 
     const device_middleware_param = async (req, res, next) => {
+        const commander_id = req.authenticated.sub;
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
         const automate_item = await AutomateItem.findOne({
             _id: req.params.id,
-            "commander._id": req.authenticated.sub
+            "commander._id": commander_id
         }).exec();
         if (!automate_item) {
             res.sendStatus(StatusCodes.NOT_FOUND);
@@ -34,8 +35,9 @@ module.exports = (ctx, r) => {
     };
 
     const device_middleware_auth = async (req, res, next) => {
+        const device_id = req.authenticated.sub;
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-        const automate_item = await AutomateItem.findById(req.authenticated.sub).exec();
+        const automate_item = await AutomateItem.findById(device_id).exec();
         if (!automate_item) {
             res.status(StatusCodes.NOT_FOUND).send("Unregistered Device");
             return;
@@ -50,14 +52,15 @@ module.exports = (ctx, r) => {
         validator.body('features').isArray(),
         inspector,
         (req, res) => {
+            const device_id = req.authenticated.sub;
             const assign_code = randomInt(1000000000, 9999999999);
             const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-            AutomateItem.findOneAndUpdate({_id: req.authenticated.sub}, {
+            AutomateItem.findOneAndUpdate({_id: device_id}, {
                 features: req.body.features,
                 assign_code
             }, {upsert: true})
                 .then(() => res.status(StatusCodes.CREATED).send({
-                    machine_id: req.authenticated.sub,
+                    machine_id: device_id,
                     assign_code: assign_code,
                     updated_features: req.body.features,
                 }))
@@ -71,8 +74,9 @@ module.exports = (ctx, r) => {
     // Manage device (for Commander)
 
     router.get("/devices", access, (req, res) => {
+        const commander_id = req.authenticated.sub;
         const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
-        AutomateItem.find({"commander._id": req.authenticated.sub})
+        AutomateItem.find({"commander._id": commander_id})
             .then((i) => res.send(i.map(sensitive_eraser)))
             .catch((e) => {
                 res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
@@ -86,6 +90,7 @@ module.exports = (ctx, r) => {
         validator.body('assign_code').isNumeric(),
         inspector,
         async (req, res) => {
+            const commander_id = req.authenticated.sub;
             const AutomateItem = ctx.database.model("AutomateItem", AutomateItemSchema);
             const automate_item = await AutomateItem.findById(req.body.machine_id).exec();
             if (!automate_item) {
@@ -97,7 +102,7 @@ module.exports = (ctx, r) => {
                 return;
             }
             automate_item.commander = {
-                _id: req.authenticated.sub,
+                _id: commander_id,
                 assign_at: ctx.now(),
             };
             automate_item.assign_code = null;
@@ -122,7 +127,7 @@ module.exports = (ctx, r) => {
         req.device.save()
             .then(() => {
                 res.sendStatus(StatusCodes.NO_CONTENT);
-                polling.publishToId("/state/poll", req.authenticated.sub, req.device.state);
+                polling.publishToId("/state/poll", req.device._id, req.device.state);
             })
             .catch((e) => {
                 res.sendStatus(StatusCodes.INTERNAL_SERVER_ERROR);
