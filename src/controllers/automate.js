@@ -2,11 +2,11 @@ const {StatusCodes} = require("http-status-codes");
 const {Router} = require("express");
 const {randomInt} = require('crypto');
 
-const access = require("../../middlewares/access");
-const AutomateItemSchema = require("../../schemas/AutomateItem");
+const access = require("../middleware/access");
+const AutomateItemSchema = require("../schemas/AutomateItem");
 
 const validator = require("express-validator");
-const inspector = require("../../middlewares/inspector");
+const inspector = require("../middleware/inspector");
 
 const sensitive_eraser = (j) => {
     if (j.assign_code) {
