@@ -1,17 +1,11 @@
-const {StatusCodes} = require("http-status-codes");
-const {Router} = require('express');
+"use strict";
 
+// Routes
 const routes = [
-    require('./automate'),
-    require('./machine'),
-    require('./weather'),
+    require("./example"),
 ];
 
+// Load routes
 module.exports = (ctx, app) => {
-    const router = Router();
-    router.get('/', (_, res) => {
-        res.send({status: StatusCodes.OK});
-    });
-    routes.forEach((c) => c(ctx, router));
-    app.use('/v1', router);
+    routes.forEach((c) => c(ctx, app));
 };

@@ -2,7 +2,10 @@
 // mongoose is an ODM library for MongoDB.
 
 // Import mongoose
-const database = require('mongoose');
+const database = require("mongoose");
+
+// Configure mongose
+database.set("strictQuery", true);
 
 // Connect to MongoDB
 database.connect(process.env.MONGODB_URI);

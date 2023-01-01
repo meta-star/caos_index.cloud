@@ -1,3 +1,15 @@
-# caOS Cloud API Service
+# template.recv
 
-> (c) 2022 Star Inc.
+後端 API 通用模板
+
+## Development
+
+```shell
+npm run dev
+```
+
+## Production
+
+```shell
+npm start
+```
