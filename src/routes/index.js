@@ -2,7 +2,9 @@
 
 // Routes
 const routes = [
-    require("./example"),
+    require("./automate"),
+    require("./machine"),
+    require("./weather"),
 ];
 
 // Load routes
