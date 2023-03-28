@@ -1,45 +1,49 @@
 "use strict";
 // Token utils of Sara.
 
-// Import jsonwebtoken
-const jwt = require("jsonwebtoken");
+// Import config
+const {getMust} = require("../config");
 
-// Import SHA256 generator
-const {sha256} = require("js-sha256");
+const axios = require("axios");
 
-// Define generalValidateOptions generator
-const generalValidateOptions = (metadata) => ({
-    algorithms: ["HS256"],
-    audience: process.env.SARA_AUDIENCE,
-    issuer: process.env.SARA_ISSUER || sha256(metadata.ctx.jwt_secret),
-    complete: true,
+const client = axios.create({
+    baseURL: getMust("SARA_RECV_HOST"),
+    headers: {
+        "User-Agent": "sara_client/2.0",
+    },
 });
 
 /**
- * Validate function (Auth)
- * @param {object} ctx - The context variable from app.js.
+ * Validate token
+ * @module sara_token
+ * @function
  * @param {string} token - The token to valid.
- * @return {boolean|object}
+ * @return {object}
  */
-function validateAuthToken(ctx, token) {
+async function validate(token) {
+    const result = {
+        userId: null,
+        payload: null,
+        isAborted: false,
+    };
+
     try {
-        const validateOptions = generalValidateOptions({ctx});
-        const data = jwt.verify(token, ctx.jwt_secret, validateOptions, null);
-        if (
-            data?.header?.sara?.version !== 1 ||
-            data?.header?.sara?.type !== "auth"
-        ) {
-            console.error("invalid_sara_code_token");
-            return false;
-        }
-        return data.payload;
+        const authResponse = await client.get("/profile", {
+            headers: {
+                "Authorization": `SARA ${token}`,
+            },
+        });
+        result.userId = authResponse.data.profile._id;
+        result.payload = authResponse.data;
     } catch (e) {
-        console.error(e);
-        return false;
+        result.isAborted = true;
+        result.payload = e;
     }
+
+    return result;
 }
 
 // Export (object)
 module.exports = {
-    validateAuthToken,
+    validate,
 };
