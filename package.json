@@ -30,7 +30,7 @@
     "uuid": "^9.0.0"
   },
   "devDependencies": {
-    "@commitlint/cli": "^17.4.4",
+    "@commitlint/cli": "^18.2.0",
     "@commitlint/config-conventional": "^17.4.4",
     "cz-conventional-changelog": "^3.3.0",
     "eslint": "^8.17.0",
